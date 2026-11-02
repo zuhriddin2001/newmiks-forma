@@ -61,6 +61,7 @@
 
   <section class="card" id="c-qty">
     <label class="t" id="l-qty">Miqdor</label>
+    <div class="chips" id="mode"><button class="chip" type="button" id="m-kg" aria-pressed="true">kg</button><button class="chip" type="button" id="m-bag" aria-pressed="false">qop</button></div>
     <div class="row"><input id="qty" type="number" inputmode="decimal" min="0" step="any" placeholder="0"><span class="unit" id="unit">qop</span></div>
     <div class="chips" id="quick"></div>
     <div class="calc" id="calc"></div>
@@ -194,8 +195,25 @@
   });
 
   // ---------- miqdor ----------
-  const quickVals = type === "raw" ? [1000, 5000, 10000, 20000] : (type === "ship" ? [20, 40, 80, 100] : [40, 100, 200, 400]);
-  quickVals.forEach(v => $("quick").appendChild(chip(String(v), () => { $("qty").value = v; refresh(); })));
+  // kg yoki qop bilan yozish (mahsulot uchun). Odatda kg.
+  state.mode = "kg";
+  if (type === "raw") show("mode", false);
+  function setMode(m) {
+    state.mode = m;
+    $("m-kg").setAttribute("aria-pressed", String(m === "kg"));
+    $("m-bag").setAttribute("aria-pressed", String(m === "bag"));
+    $("qty").value = "";
+    buildQuick(); refresh(); $("qty").focus();
+  }
+  $("m-kg").addEventListener("click", () => setMode("kg"));
+  $("m-bag").addEventListener("click", () => setMode("bag"));
+  function buildQuick() {
+    $("quick").innerHTML = "";
+    const vals = (type === "raw" || state.mode === "kg") ? [1000, 5000, 10000, 20000]
+               : (type === "ship" ? [20, 40, 80, 100] : [40, 100, 200, 400]);
+    vals.forEach(v => $("quick").appendChild(chip(String(v), () => { $("qty").value = v; refresh(); })));
+  }
+  buildQuick();
 
   // ---------- manzil ----------
   const pbox = $("places");
@@ -233,9 +251,15 @@
   function refresh() {
     const c = current();
     let unit = "kg";
-    if (type !== "raw") { const p = products.find(x => x.name === c.product); unit = p ? p.unit : "qop";
-      $("calc").innerHTML = p && c.qty > 0 ? "= <b>" + fmt(c.qty * p.kg) + " kg</b> (" + p.kg + " kg dan)" : "";
-      $("total").innerHTML = p && c.qty > 0 && c.price > 0 ? "1 " + p.unit + ": <b>" + fmt(c.price / c.qty) + "</b> so'm · 1 kg: <b>" + fmt(c.price / (c.qty * p.kg)) + "</b> so'm" : ""; }
+    if (type !== "raw") { const p = products.find(x => x.name === c.product); const bag = p ? p.unit : "qop";
+      $("m-bag").textContent = bag;
+      unit = state.mode === "kg" ? "kg" : bag;
+      const kg = p && c.qty > 0 ? (state.mode === "kg" ? c.qty : c.qty * p.kg) : 0;
+      const bags = p ? kg / p.kg : 0;
+      $("calc").innerHTML = !kg ? "" : state.mode === "kg"
+        ? "= <b>" + fmt(bags) + " " + bag + "</b> (" + p.kg + " kg dan)"
+        : "= <b>" + fmt(kg) + " kg</b> (" + p.kg + " kg dan)";
+      $("total").innerHTML = kg && c.price > 0 ? "1 " + bag + ": <b>" + fmt(c.price / bags) + "</b> so'm · 1 kg: <b>" + fmt(c.price / kg) + "</b> so'm" : ""; }
     else { unit = isPiece(c.product) ? "dona" : "kg"; $("calc").textContent = "";
       $("l-price").textContent = "1 " + unit + " narxi (so'm) — ixtiyoriy";
       $("total").innerHTML = c.qty > 0 && c.price > 0 ? "Jami: <b>" + fmt(c.qty * c.price) + " so'm</b>" : ""; }
@@ -260,6 +284,7 @@
     if (p) { $("err").textContent = p; if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("error"); return; }
     const out = { t: type, product: c.product };
     if (type === "raw") { out.qty = c.qty; out.party = c.party; if (c.price > 0) out.price = c.price; store.add("suppliers", c.party); }
+    else if (state.mode === "kg") { out.kg = c.qty; }
     else { out.count = c.qty; }
     if (type === "ship") { out.party = c.party; out.place = c.place; out.truck = c.truck; if (c.price > 0) out.sum = c.price; store.add("customers", c.party); store.add("trucks", c.truck); }
     if (tg && tg.sendData) { tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success"); tg.sendData(JSON.stringify(out)); }
