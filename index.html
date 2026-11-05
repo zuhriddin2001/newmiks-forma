@@ -92,6 +92,16 @@
     <div class="calc" id="total"></div>
   </section>
 
+  <section class="card" id="c-when">
+    <label class="t">Qachon bo'ldi?</label>
+    <div class="chips">
+      <button class="chip" type="button" id="w-now" aria-pressed="true">Hozir</button>
+      <button class="chip" type="button" id="w-yest" aria-pressed="false">Kecha</button>
+      <button class="chip" type="button" id="w-other" aria-pressed="false">📅 Boshqa kun</button>
+    </div>
+    <input id="when" type="datetime-local" class="hidden">
+  </section>
+
   <div class="err" id="err"></div>
   <button id="send" type="button">✅ Saqlash</button>
 </main>
@@ -283,6 +293,8 @@
     const c = current(); const p = problem(c);
     if (p) { $("err").textContent = p; if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("error"); return; }
     const out = { t: type, product: c.product };
+    const w = whenValue();
+    if (w) out.ts = w;
     if (type === "raw") { out.qty = c.qty; out.party = c.party; if (c.price > 0) out.price = c.price; store.add("suppliers", c.party); }
     else if (state.mode === "kg") { out.kg = c.qty; }
     else { out.count = c.qty; }
@@ -291,6 +303,23 @@
     else if (demo) { window.parent.postMessage({ newmiksDemo: out }, "*"); $("err").textContent = ""; }
     else { $("err").textContent = "Bu forma faqat Telegram ichida ishlaydi."; }
   }
+  // ---------- qachon bo'ldi ----------
+  const pad = n => String(n).padStart(2, "0");
+  const local = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  let whenMode = "now";
+  function setWhen(m) {
+    whenMode = m;
+    ["now", "yest", "other"].forEach(k => $("w-" + k).setAttribute("aria-pressed", String(k === m)));
+    show("when", m !== "now");
+    if (m === "yest") { const d = new Date(); d.setDate(d.getDate() - 1); $("when").value = local(d); }
+    if (m === "other" && !$("when").value) $("when").value = local(new Date());
+    $("when").max = local(new Date());
+  }
+  $("w-now").addEventListener("click", () => setWhen("now"));
+  $("w-yest").addEventListener("click", () => setWhen("yest"));
+  $("w-other").addEventListener("click", () => setWhen("other"));
+  function whenValue() { return whenMode === "now" ? null : ($("when").value || null); }
+
   if (tg && tg.MainButton) tg.MainButton.onClick(submit);
   $("send").addEventListener("click", submit);
 
