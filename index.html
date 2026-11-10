@@ -65,20 +65,21 @@
   </section>
 
   <section class="card hidden" id="c-text">
-    <label class="t">📋 Buyurtma matni</label>
+    <label class="t" id="l-text">📋 Buyurtma matni</label>
     <textarea id="otext" placeholder="Matnni shu yerga tashlang, masalan:&#10;&#10;AGROBUSNESS. SP. MANAGEMENT. Dunbirobod&#10;Fura 70 713 QBA&#10;Tel 33-937-3232&#10;Plaster mp77 25 tonna&#10;Betonakantak 10 ta&#10;Ism Sherali aka xoji&#10;8.000.000 sum berilgan&#10;Perecheslena 7-res&#10;Yuk 25 tonna 115 sum&#10;Yulkira 2.875.000 sum"></textarea>
     <div class="chips"><button class="chip" type="button" id="paste">📋 Nusxadan qo'yish</button><button class="chip" type="button" id="clear">🗑 Tozalash</button></div>
     <div class="found" id="found"></div>
   </section>
 
   <section class="card hidden" id="c-prices">
-    <label class="t">💵 Narxi (1 kg uchun, so'm)</label>
+    <label class="t" id="l-prices">💵 Narxi (1 kg uchun, so'm)</label>
+    <input id="tparty" type="text" class="hidden" autocomplete="off" placeholder="Kimdan keldi (yetkazib beruvchi)">
     <div id="plist" class="found"></div>
     <div class="sum" id="psum"></div>
   </section>
 
   <section class="card hidden" id="c-day">
-    <label class="t">📅 Qaysi kuni ketdi?</label>
+    <label class="t" id="l-day">📅 Qaysi kuni ketdi?</label>
     <div class="chips">
       <button class="chip" type="button" id="d-t" aria-pressed="true">Bugun</button>
       <button class="chip" type="button" id="d-y" aria-pressed="false">Kecha</button>
@@ -355,15 +356,18 @@
   $("send").addEventListener("click", submit);
 
   if (!names.length) $("err").textContent = "Ro'yxat kelmadi. Botda /start bosib, tugmani qaytadan bosing.";
-  if (type === "ship") {
-    textApi = shipText();
-    const FORM = ["c-product","c-qty","c-party","c-truck","c-price","c-when"], TEXT = ["c-text","c-prices","c-day"];
+  {
+    textApi = type === "ship" ? shipText() : rpText();
+    const FORM = type === "ship" ? ["c-product","c-qty","c-party","c-truck","c-price","c-when"]
+               : type === "raw" ? ["c-product","c-qty","c-party","c-price","c-when"] : ["c-product","c-qty","c-when"];
+    const TEXT = ["c-text","c-prices","c-day"];
     function setShipMode(m) {
       shipMode = m;
       $("sm-form").setAttribute("aria-pressed", String(m === "form"));
       $("sm-text").setAttribute("aria-pressed", String(m === "text"));
       FORM.forEach(id => show(id, m === "form"));
       TEXT.forEach(id => show(id, m === "text"));
+      if (m === "text") show("c-how", false);
       $("err").textContent = "";
       refresh();
     }
@@ -377,6 +381,157 @@
   // =================================================================
   //  🚚 YUK JO'NATILDI — matn tashlanadi, narx va kun yoziladi
   // =================================================================
+  // =================================================================
+  //  📦 XOMASHYO / 🏭 ISHLAB CHIQARISH — matndan, bir nechta mahsulot birdan
+  // =================================================================
+  function rpText() {
+    const raw = type === "raw";
+    const items0 = raw ? (data.r || []).map(n => ({ name: n, piece: isPiece(n), kg: 1 }))
+                       : (data.p || []).map(x => ({ name: x[0], unit: x[1], kg: x[2], piece: false }));
+    $("l-text").textContent = raw ? "📋 Kelgan xomashyo matni" : "📋 Ishlab chiqarilgan mahsulot matni";
+    $("otext").placeholder = raw ? "Masalan:\n\nAzim aka sement\nSement 30 tonna sochma\nQum 20 tonna\nQop 5000 dona"
+                                 : "Masalan:\n\nPlaster 05 20 tonna\nKliy 510 400 qop\nFinish 5 tonna";
+    $("l-prices").textContent = raw ? "💵 Narxi va qanday keldi" : "📦 Topilgan mahsulotlar";
+    $("l-day").textContent = raw ? "📅 Qaysi kuni keldi?" : "📅 Qaysi kuni ishlab chiqarildi?";
+    show("tparty", raw);
+    const norm = x => String(x).toLowerCase().replace(/[ʻ‘’]/g, "'").replace(/[^a-z0-9а-яё]/g, "");
+    const GENERIC = ["plaster","kliy","qora","pol","kafel","suvoq","qop"];
+    function match(low) {
+      const n = norm(low); let best = null, bl = 0;
+      items0.forEach(p => {
+        const full = norm(p.name); let len = 0;
+        if (full && n.includes(full)) len = full.length + 100;
+        else {
+          p.name.toLowerCase().split(/[\s.]+/).forEach(w => { const nw = norm(w); if (nw.length >= 3 && !GENERIC.includes(nw) && n.includes(nw) && nw.length > len) len = nw.length; });
+          if (!len && full === "plaster05" && /(rodman|plaster)[\s.]*0?5(?!\d)/.test(low)) len = 50;
+        }
+        if (len > bl) { bl = len; best = p; }
+      });
+      return best;
+    }
+    function parse(text) {
+      const r = { items: [], party: null };
+      text.split(/\r?\n/).forEach(rawLine => {
+        const line = rawLine.trim(); if (!line) return;
+        const low = line.toLowerCase();
+        const p = match(low);
+        if (p) {
+          let rest = low; p.name.toLowerCase().split(/\s+/).forEach(w => { if (w.length > 1) rest = rest.split(w).join(" "); });
+          rest = rest.replace(/(rodman|plaster|kafel)[\s.]*(0?5|mp\s*77)?(?!\d)/g, " ");
+          const qm = rest.match(/(\d+(?:[.,]\d+)?)\s*(tonna|tonn|tn|t|kg|kilo|qop|meshok|ta|dona|sht|paqir|vedro)(?![a-z])/);
+          let n = null, unit = null;
+          if (qm) { n = parseFloat(qm[1].replace(",", ".")); unit = qm[2]; }
+          else { const nm = rest.match(/\d+(?:[.,]\d+)?/); if (nm) { n = parseFloat(nm[0].replace(",", ".")); unit = "?"; } }
+          if (n > 0) {
+            let q;
+            if (p.piece) q = n;                                     // dona
+            else if (unit === "ta" || unit === "qop" || unit === "meshok" || unit === "paqir" || unit === "vedro" || unit === "dona" || unit === "sht") q = raw ? n * 50 : n * p.kg;
+            else if (unit[0] === "t") q = n * 1000; else if (unit[0] === "k") q = n;
+            else q = n <= 100 ? n * 1000 : n;
+            r.items.push({ p, q, bulk: /sochma|sochiq|sementovoz|nasip/.test(low) ? true : null, note: raw && !p.piece && /qop|meshok/.test(unit || "") ? "qop 50 kg deb olindi" : "" });
+            return;
+          }
+        }
+        if (!r.party && !/^\d/.test(line)) r.party = line;
+      });
+      return r;
+    }
+    const tons = kg => kg >= 1000 ? fmt(kg / 1000) + " t" : fmt(kg) + " kg";
+    const esc = x => String(x).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+    const savedP = {}, savedH = {};
+    let cur = { items: [] }, partyTouched = false;
+    $("tparty").addEventListener("input", () => { partyTouched = true; check(); });
+    function render() {
+      cur = parse($("otext").value);
+      if (raw && !partyTouched) $("tparty").value = cur.party || "";
+      $("found").innerHTML = "";
+      const box = $("plist"); box.innerHTML = "";
+      if (!cur.items.length) box.innerHTML = "<span class=k>Matnni tashlang — " + (raw ? "xomashyolar" : "mahsulotlar") + " shu yerda chiqadi.</span>";
+      cur.items.forEach(it => {
+        const d = document.createElement("div"); d.className = "pr";
+        const qtxt = it.p.piece ? fmt(it.q) + " dona" : tons(it.q) + (raw ? "" : " (" + fmt(Math.round(it.q / it.p.kg)) + " " + esc(it.p.unit) + ")");
+        d.innerHTML = "<div class=n>" + (raw ? "📦 " : "🏭 ") + esc(it.p.name) + " — " + qtxt + "</div>" + (it.note ? "<div class=s>" + it.note + "</div>" : "");
+        if (raw) {
+          const inp = document.createElement("input"); inp.type = "text"; inp.inputMode = "decimal";
+          inp.placeholder = "1 " + (it.p.piece ? "dona" : "kg") + " narxi — ixtiyoriy";
+          inp.value = savedP[it.p.name] || "";
+          const sm = document.createElement("div"); sm.className = "s";
+          const upd = () => { savedP[it.p.name] = inp.value; const v = num(inp.value); it.price = v > 0 ? v : null;
+            sm.textContent = it.price ? "= " + fmt(it.price * it.q) + " so'm" : ""; total(); };
+          inp.addEventListener("input", upd);
+          d.appendChild(inp); d.appendChild(sm);
+          if (!it.p.piece) {
+            if (savedH[it.p.name] !== undefined) it.bulk = savedH[it.p.name];
+            const ch = document.createElement("div"); ch.className = "chips";
+            const mk = (txt, val) => { const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = txt;
+              b.setAttribute("aria-pressed", String(it.bulk === val));
+              b.addEventListener("click", () => { it.bulk = val; savedH[it.p.name] = val; ch.querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", String(c === b))); check(); });
+              return b; };
+            ch.appendChild(mk("📦 Qopda", false)); ch.appendChild(mk("🚛 Sochma", true));
+            d.appendChild(ch);
+          }
+          upd();
+        }
+        box.appendChild(d);
+      });
+      total(); check();
+    }
+    function total() {
+      if (!raw) { const kg = cur.items.reduce((a, it) => a + it.q, 0); $("psum").innerHTML = kg ? "⚖️ Jami: <b>" + tons(kg) + "</b>" : ""; return; }
+      let s = 0; cur.items.forEach(it => { if (it.price) s += it.price * it.q; });
+      $("psum").innerHTML = s ? "💰 Jami: <b>" + fmt(s) + " so'm</b>" : "";
+    }
+    const pad = n => String(n).padStart(2, "0");
+    const ymd = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+    let day = "t";
+    function setDay(k) { day = k; ["t","y","c"].forEach(j => $("d-" + j).setAttribute("aria-pressed", String(j === k)));
+      $("dday").classList.toggle("hidden", k !== "c"); $("dday").max = ymd(new Date());
+      if (k === "c") { if (!$("dday").value) $("dday").value = ymd(new Date()); try { $("dday").showPicker(); } catch (e) {} } check(); }
+    ["t","y","c"].forEach(k => $("d-" + k).addEventListener("click", () => setDay(k)));
+    $("dday").addEventListener("change", check);
+    function tsValue() {
+      const now = new Date(), hm = "T" + pad(now.getHours()) + ":" + pad(now.getMinutes());
+      if (day === "t") return null;
+      if (day === "y") { const d = new Date(); d.setDate(d.getDate() - 1); return ymd(d) + hm; }
+      const v = $("dday").value; return v && v !== ymd(now) ? v + hm : null;
+    }
+    function problem() {
+      if (!$("otext").value.trim()) return "Matnni tashlang";
+      if (!cur.items.length) return raw ? "Matnda xomashyo topilmadi" : "Matnda mahsulot topilmadi";
+      if (raw && !$("tparty").value.trim()) return "Kimdan kelganini yozing";
+      if (raw && cur.items.some(it => !it.p.piece && it.bulk == null)) return "Qopdami yoki sochmami — tanlang";
+      if (day === "c" && !$("dday").value) return "Kunni tanlang";
+      return null;
+    }
+    function check() {
+      if (shipMode !== "text") return;
+      const p = problem();
+      if (tg && tg.MainButton) {
+        tg.MainButton.setText(p ? p : "✅ Saqlash");
+        p ? tg.MainButton.disable() : tg.MainButton.enable();
+        tg.MainButton.color = p ? (tg.themeParams.hint_color || "#8a9099") : (tg.themeParams.button_color || "#2f7de1");
+        tg.MainButton.show();
+      } else { $("send").style.display = "block"; $("send").textContent = p ? p : "✅ Saqlash"; $("send").disabled = !!p; }
+    }
+    function send() {
+      const p = problem(); if (p) { $("err").textContent = p; return; }
+      const out = { t: type };
+      if (raw) {
+        out.party = $("tparty").value.trim().slice(0, 60); store.add("suppliers", out.party);
+        out.multi = cur.items.map(it => { const o = { product: it.p.name, qty: Math.round(it.q * 1000) / 1000 }; if (it.price) o.price = it.price; if (it.bulk) o.bulk = true; return o; });
+      } else out.multi = cur.items.map(it => ({ product: it.p.name, kg: Math.round(it.q * 1000) / 1000 }));
+      const w = tsValue(); if (w) out.ts = w;
+      if (tg && tg.sendData) { tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success"); tg.sendData(JSON.stringify(out)); }
+      else if (demo) window.parent.postMessage({ newmiksDemo: out }, "*");
+      else $("err").textContent = "Bu forma faqat Telegram ichida ishlaydi.";
+    }
+    let tmr; $("otext").addEventListener("input", () => { clearTimeout(tmr); tmr = setTimeout(render, 250); });
+    $("paste").addEventListener("click", async () => { try { $("otext").value = await navigator.clipboard.readText(); render(); } catch (e) { $("otext").focus(); $("err").textContent = "Matn maydonini bosib turing va «Вставить» ni tanlang."; } });
+    $("clear").addEventListener("click", () => { $("otext").value = ""; render(); $("otext").focus(); });
+    render();
+    return { send, check };
+  }
+
   function shipText() {
     const products = (data.p || []).map(x => ({ name: x[0], unit: x[1], kg: x[2] }));
     const num2 = v => {
