@@ -61,12 +61,12 @@
   <h1 id="title">Forma</h1>
 
   <section class="card hidden" id="c-mode">
-    <div class="chips"><button class="chip" type="button" id="sm-form" aria-pressed="true">✍️ Qo'lda kiritish</button><button class="chip" type="button" id="sm-text" aria-pressed="false">📋 Matndan kiritish</button></div>
+    <div class="chips"><button class="chip" type="button" id="sm-form" aria-pressed="true">✍️ Qo'lda kiritish</button><button class="chip" type="button" id="sm-text" aria-pressed="false">📋 Matndan kiritish</button><button class="chip hidden" type="button" id="sm-photo" aria-pressed="false">📷 Rasmdan</button></div>
   </section>
 
   <section class="card hidden" id="c-text">
     <label class="t" id="l-text">📋 Buyurtma matni</label>
-    <textarea id="otext" placeholder="Matnni shu yerga tashlang, masalan:&#10;&#10;AGROBUSNESS. SP. MANAGEMENT. Dunbirobod&#10;Fura 70 713 QBA&#10;Tel 33-937-3232&#10;Plaster mp77 25 tonna&#10;Betonakantak 10 ta&#10;Ism Sherali aka xoji&#10;8.000.000 sum berilgan&#10;Perecheslena 7-res&#10;Yuk 25 tonna 115 sum&#10;Yulkira 2.875.000 sum"></textarea>
+    <textarea id="otext" placeholder="Matnni shu yerga tashlang, masalan:&#10;&#10;Nakladnoy 125&#10;AGROBUSNESS. SP. MANAGEMENT. Dunbirobod&#10;Fura 70 713 QBA&#10;Tel 33-937-3232&#10;Plaster mp77 25 tonna&#10;Betonakantak 10 ta&#10;Ism Sherali aka xoji&#10;8.000.000 sum berilgan&#10;Perecheslena 7-res&#10;Yuk 25 tonna 115 sum&#10;Yulkira 2.875.000 sum"></textarea>
     <div class="chips"><button class="chip" type="button" id="paste">📋 Nusxadan qo'yish</button><button class="chip" type="button" id="clear">🗑 Tozalash</button></div>
     <div class="found" id="found"></div>
   </section>
@@ -119,6 +119,11 @@
     <input id="truck" type="text" list="truckList" autocomplete="off" placeholder="01 A 123 BC" style="text-transform:uppercase">
     <datalist id="truckList"></datalist>
     <div class="chips"><button class="chip" type="button" id="selfPick">Xaridor o'zi olib ketdi</button></div>
+  </section>
+
+  <section class="card hidden" id="c-nak">
+    <label class="t">🧾 Nakladnoy raqami</label>
+    <input id="nak" type="text" inputmode="text" autocomplete="off" placeholder="Masalan: 125 — bo'lmasa bo'sh qoldiring">
   </section>
 
   <section class="card" id="c-price">
@@ -330,7 +335,7 @@
     if (type === "raw") { out.qty = c.qty; out.party = c.party; if (c.price > 0) out.price = c.price; if (state.how === "bulk" && !isPiece(c.product)) out.bulk = true; store.add("suppliers", c.party); }
     else if (state.mode === "kg") { out.kg = c.qty; }
     else { out.count = c.qty; }
-    if (type === "ship") { out.party = c.party; out.truck = c.truck; if (c.price > 0) out.sum = c.price; store.add("customers", c.party); store.add("trucks", c.truck); }
+    if (type === "ship") { const nk = $("nak").value.trim(); if (nk) out.nak = nk.slice(0, 20); out.party = c.party; out.truck = c.truck; if (c.price > 0) out.sum = c.price; store.add("customers", c.party); store.add("trucks", c.truck); }
     if (tg && tg.sendData) { tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success"); tg.sendData(JSON.stringify(out)); }
     else if (demo) { window.parent.postMessage({ newmiksDemo: out }, "*"); $("err").textContent = ""; }
     else { $("err").textContent = "Bu forma faqat Telegram ichida ishlaydi."; }
@@ -358,7 +363,7 @@
   if (!names.length) $("err").textContent = "Ro'yxat kelmadi. Botda /start bosib, tugmani qaytadan bosing.";
   {
     textApi = type === "ship" ? shipText() : rpText();
-    const FORM = type === "ship" ? ["c-product","c-qty","c-party","c-truck","c-price","c-when"]
+    const FORM = type === "ship" ? ["c-product","c-qty","c-party","c-truck","c-nak","c-price","c-when"]
                : type === "raw" ? ["c-product","c-qty","c-party","c-price","c-when"] : ["c-product","c-qty","c-when"];
     const TEXT = ["c-text","c-prices","c-day"];
     function setShipMode(m) {
@@ -374,6 +379,15 @@
     show("c-mode", true);
     $("sm-form").addEventListener("click", () => setShipMode("form"));
     $("sm-text").addEventListener("click", () => setShipMode("text"));
+    if (type === "ship") {
+      show("sm-photo", true);
+      $("sm-photo").addEventListener("click", () => {
+        const out = { t: "ship", photo: true };
+        if (tg && tg.sendData) tg.sendData(JSON.stringify(out));
+        else if (demo) window.parent.postMessage({ newmiksDemo: out }, "*");
+        else $("err").textContent = "Telegram'da oching: forma yopiladi, keyin nakladnoy rasmini botga yuborasiz.";
+      });
+    }
     setShipMode("form");
   }
   refresh();
@@ -397,12 +411,15 @@
     const norm = x => String(x).toLowerCase().replace(/[ʻ‘’]/g, "'").replace(/[^a-z0-9а-яё]/g, "");
     const GENERIC = ["plaster","kliy","qora","pol","kafel","suvoq","qop"];
     function match(low) {
+      low = low.replace(/(plaster|rodman|mp)[\s.]*o(\d)/g, "$1 0$2");
       const n = norm(low); let best = null, bl = 0;
       items0.forEach(p => {
         const full = norm(p.name); let len = 0;
         if (full && n.includes(full)) len = full.length + 100;
         else {
           p.name.toLowerCase().split(/[\s.]+/).forEach(w => { const nw = norm(w); if (nw.length >= 3 && !GENERIC.includes(nw) && n.includes(nw) && nw.length > len) len = nw.length; });
+          const ws = p.name.toLowerCase().split(/\s+/);
+          for (let k = 0; k + 1 < ws.length; k++) { const pr = norm(ws[k] + ws[k + 1]); if (pr.length >= 4 && n.includes(pr) && pr.length + 50 > len) len = pr.length + 50; }
           if (!len && full === "plaster05" && /(rodman|plaster)[\s.]*0?5(?!\d)/.test(low)) len = 50;
         }
         if (len > bl) { bl = len; best = p; }
@@ -416,7 +433,7 @@
         const low = line.toLowerCase();
         const p = match(low);
         if (p) {
-          let rest = low; p.name.toLowerCase().split(/\s+/).forEach(w => { if (w.length > 1) rest = rest.split(w).join(" "); });
+          let rest = low.replace(/(plaster|rodman|mp)[\s.]*o(\d)/g, "$1 0$2"); p.name.toLowerCase().split(/\s+/).forEach(w => { if (w.length > 1) rest = rest.split(w).join(" "); });
           rest = rest.replace(/(rodman|plaster|kafel)[\s.]*(0?5|mp\s*77)?(?!\d)/g, " ");
           const qm = rest.match(/(\d+(?:[.,]\d+)?)\s*(tonna|tonn|tn|t|kg|kilo|qop|meshok|ta|dona|sht|paqir|vedro)(?![a-z])/);
           let n = null, unit = null;
@@ -432,6 +449,7 @@
             return;
           }
         }
+        if (/\d\s*(tonna|tonn|tn|t|kg|qop|meshok|ta|dona|paqir)(?![a-z])/.test(low)) { (r.miss = r.miss || []).push(line); return; }
         if (!r.party && !/^\d/.test(line)) r.party = line;
       });
       return r;
@@ -444,7 +462,7 @@
     function render() {
       cur = parse($("otext").value);
       if (raw && !partyTouched) $("tparty").value = cur.party || "";
-      $("found").innerHTML = "";
+      $("found").innerHTML = (cur.miss || []).map(m => "<div style='color:var(--danger)'>❓ Topilmadi: " + esc(m) + "</div>").join("");
       const box = $("plist"); box.innerHTML = "";
       if (!cur.items.length) box.innerHTML = "<span class=k>Matnni tashlang — " + (raw ? "xomashyolar" : "mahsulotlar") + " shu yerda chiqadi.</span>";
       cur.items.forEach(it => {
@@ -547,12 +565,15 @@
     const norm = x => x.toLowerCase().replace(/[ʻ‘’]/g, "'").replace(/[^a-z0-9а-яё]/g, "");
     const GENERIC = ["plaster","kliy","qora","pol","kafel","suvoq"];
     function match(low) {
+      low = low.replace(/(plaster|rodman|mp)[\s.]*o(\d)/g, "$1 0$2");
       const n = norm(low); let best = null, bl = 0;
       products.forEach(p => {
         const full = norm(p.name); let len = 0;
         if (n.includes(full)) len = full.length + 100;
         else {
           p.name.toLowerCase().split(/\s+/).forEach(w => { const nw = norm(w); if (nw.length >= 3 && !GENERIC.includes(nw) && n.includes(nw) && nw.length > len) len = nw.length; });
+          const ws = p.name.toLowerCase().split(/\s+/);
+          for (let k = 0; k + 1 < ws.length; k++) { const pr = norm(ws[k] + ws[k + 1]); if (pr.length >= 4 && n.includes(pr) && pr.length + 50 > len) len = pr.length + 50; }
           if (!len && full === "plaster05" && /(rodman|plaster)[\s.]*0?5(?!\d)/.test(low)) len = 50;
         }
         if (len > bl) { bl = len; best = p; }
@@ -560,17 +581,19 @@
       return best;
     }
     function parse(text) {
-      const r = { items: [], party: null, truck: null, phone: null };
+      const r = { items: [], party: null, truck: null, phone: null, nak: null };
       text.split(/\r?\n/).forEach(raw => {
         const line = raw.trim(); if (!line) return;
         const low = line.toLowerCase();
+        const nm = line.match(/^\s*(?:nakl[a-z']*|nak|накл[а-я]*|nomer|raqami?|№|#|n\s*[.:№])\s*[:#№.\-]*\s*([A-Za-z]{0,3}[\-/]?\d[\w/\-]{0,15})\s*$/i);
+        if (nm && !r.nak) { r.nak = nm[1].toUpperCase(); return; }
         if (/^(tel|\+998|тел)/.test(low)) { if (!r.phone) r.phone = line.replace(/^(tel[a-z.:]*|тел[а-я.:]*)/i, "").trim(); return; }
         if (/^yuk|kira|dostavka|dastavka|berilgan|berildi|avans|oldindan|perech|perich|naqd|nalich|^ism|haydovchi/.test(low)) return;
         const tm = line.match(/(?:^|\D)(\d{2})[\s.\-]*([A-Za-z])?[\s.\-]*(\d{3})[\s.\-]*([A-Za-z]{2,3})(?![A-Za-z])/);
         const p = match(low);
         if (!p && tm && !/sum|som|so'm|ming|mln/i.test(tm[4])) { if (!r.truck) r.truck = (tm[1] + (tm[2] || "") + tm[3] + tm[4]).toUpperCase(); return; }
         if (p) {
-          let rest = low; p.name.toLowerCase().split(/\s+/).forEach(w => { rest = rest.split(w).join(" "); });
+          let rest = low.replace(/(plaster|rodman|mp)[\s.]*o(\d)/g, "$1 0$2"); p.name.toLowerCase().split(/\s+/).forEach(w => { rest = rest.split(w).join(" "); });
           rest = rest.replace(/(rodman|plaster|kafel)[\s.]*(0?5|mp\s*77)?(?!\d)/g, " ");
           const qm = rest.match(/(\d+(?:[.,]\d+)?)\s*(tonna|tonn|tn|t|kg|kilo|qop|meshok|ta|dona|sht|paqir|vedro)(?![a-z])/);
           let n = null, unit = null;
@@ -583,6 +606,7 @@
             r.items.push({ p, kg }); return;
           }
         }
+        if (/\d\s*(tonna|tonn|tn|t|kg|qop|meshok|ta|dona|paqir)(?![a-z])/.test(low)) { (r.miss = r.miss || []).push(line); return; }
         if (!r.party) r.party = line;
       });
       return r;
@@ -595,7 +619,9 @@
       const f = [];
       if (cur.party) f.push("<span class=k>👤 Kimga:</span> " + esc(cur.party));
       if (cur.truck) f.push("<span class=k>🚛 Mashina:</span> " + esc(cur.truck));
+      f.push("<span class=k>🧾 Nakladnoy №:</span> " + (cur.nak ? "<b>" + esc(cur.nak) + "</b>" : "— yozilmagan"));
       if (cur.phone) f.push("<span class=k>📞 Tel:</span> " + esc(cur.phone));
+      (cur.miss || []).forEach(m => f.push("<span style='color:var(--danger)'>❓ Mahsulot topilmadi: " + esc(m) + "</span>"));
       $("found").innerHTML = f.map(x => "<div>" + x + "</div>").join("");
       const box = $("plist"); box.innerHTML = "";
       if (!cur.items.length) box.innerHTML = "<span class=k>Matnni tashlang — mahsulotlar shu yerda chiqadi.</span>";
