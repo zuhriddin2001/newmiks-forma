@@ -408,7 +408,7 @@
     $("l-prices").textContent = raw ? "💵 Narxi va qanday keldi" : "📦 Topilgan mahsulotlar";
     $("l-day").textContent = raw ? "📅 Qaysi kuni keldi?" : "📅 Qaysi kuni ishlab chiqarildi?";
     show("tparty", raw);
-    const norm = x => String(x).toLowerCase().replace(/[ʻ‘’]/g, "'").replace(/[^a-z0-9а-яё]/g, "");
+    const norm = x => String(x).toLowerCase().replace(/[ʻ‘’]/g, "'").replace(/[аосерхкмт]/g, c => "aocepxkmt"["аосерхкмт".indexOf(c)]).replace(/o/g, "0").replace(/[^a-z0-9а-яё]/g, "");
     const GENERIC = ["plaster","kliy","qora","pol","kafel","suvoq","qop"];
     function match(low) {
       low = low.replace(/(plaster|rodman|mp)[\s.]*o(\d)/g, "$1 0$2");
@@ -417,7 +417,7 @@
         const full = norm(p.name); let len = 0;
         if (full && n.includes(full)) len = full.length + 100;
         else {
-          p.name.toLowerCase().split(/[\s.]+/).forEach(w => { const nw = norm(w); if (nw.length >= 3 && !GENERIC.includes(nw) && n.includes(nw) && nw.length > len) len = nw.length; });
+          p.name.toLowerCase().split(/[\s.]+/).forEach(w => { const nw = norm(w); if (nw.length >= 3 && !GENERIC.map(norm).includes(nw) && n.includes(nw) && nw.length > len) len = nw.length; });
           const ws = p.name.toLowerCase().split(/\s+/);
           for (let k = 0; k + 1 < ws.length; k++) { const pr = norm(ws[k] + ws[k + 1]); if (pr.length >= 4 && n.includes(pr) && pr.length + 50 > len) len = pr.length + 50; }
           if (!len && full === "plaster05" && /(rodman|plaster)[\s.]*0?5(?!\d)/.test(low)) len = 50;
@@ -562,7 +562,7 @@
       else t = t.replace(",", ".");
       const n = parseFloat(t) * mul; return n > 0 && isFinite(n) ? n : NaN;
     };
-    const norm = x => x.toLowerCase().replace(/[ʻ‘’]/g, "'").replace(/[^a-z0-9а-яё]/g, "");
+    const norm = x => String(x).toLowerCase().replace(/[ʻ‘’]/g, "'").replace(/[аосерхкмт]/g, c => "aocepxkmt"["аосерхкмт".indexOf(c)]).replace(/o/g, "0").replace(/[^a-z0-9а-яё]/g, "");
     const GENERIC = ["plaster","kliy","qora","pol","kafel","suvoq"];
     function match(low) {
       low = low.replace(/(plaster|rodman|mp)[\s.]*o(\d)/g, "$1 0$2");
@@ -571,7 +571,7 @@
         const full = norm(p.name); let len = 0;
         if (n.includes(full)) len = full.length + 100;
         else {
-          p.name.toLowerCase().split(/\s+/).forEach(w => { const nw = norm(w); if (nw.length >= 3 && !GENERIC.includes(nw) && n.includes(nw) && nw.length > len) len = nw.length; });
+          p.name.toLowerCase().split(/\s+/).forEach(w => { const nw = norm(w); if (nw.length >= 3 && !GENERIC.map(norm).includes(nw) && n.includes(nw) && nw.length > len) len = nw.length; });
           const ws = p.name.toLowerCase().split(/\s+/);
           for (let k = 0; k + 1 < ws.length; k++) { const pr = norm(ws[k] + ws[k + 1]); if (pr.length >= 4 && n.includes(pr) && pr.length + 50 > len) len = pr.length + 50; }
           if (!len && full === "plaster05" && /(rodman|plaster)[\s.]*0?5(?!\d)/.test(low)) len = 50;
@@ -622,6 +622,7 @@
       f.push("<span class=k>🧾 Nakladnoy №:</span> " + (cur.nak ? "<b>" + esc(cur.nak) + "</b>" : "— yozilmagan"));
       if (cur.phone) f.push("<span class=k>📞 Tel:</span> " + esc(cur.phone));
       (cur.miss || []).forEach(m => f.push("<span style='color:var(--danger)'>❓ Mahsulot topilmadi: " + esc(m) + "</span>"));
+      if (cur.miss && cur.miss.length) f.push("<span class=k>Botdagi mahsulotlar: " + esc(products.map(p => p.name).join(", ")) + "</span>");
       $("found").innerHTML = f.map(x => "<div>" + x + "</div>").join("");
       const box = $("plist"); box.innerHTML = "";
       if (!cur.items.length) box.innerHTML = "<span class=k>Matnni tashlang — mahsulotlar shu yerda chiqadi.</span>";
