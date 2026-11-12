@@ -111,7 +111,7 @@
 
   <section class="card hidden" id="c-how">
     <label class="t">Qanday keldi?</label>
-    <div class="chips"><button class="chip" type="button" id="h-bag" aria-pressed="false">📦 Qopda (ishchilar tushirdi)</button><button class="chip" type="button" id="h-bulk" aria-pressed="false">🚛 Sochma (o'zi to'kildi)</button></div>
+    <div class="chips"><button class="chip" type="button" id="h-bag" aria-pressed="false">📦 Qopda (ishchilar tushirdi)</button><button class="chip" type="button" id="h-bulk" aria-pressed="false">🚛 Sementovozda keldi (o'zi to'kildi)</button></div>
   </section>
 
   <section class="card" id="c-party">
@@ -288,7 +288,7 @@
   function problem(c) {
     if (!c.product) return type === "raw" ? "Xomashyoni tanlang" : "Mahsulotni tanlang";
     if (!(c.qty > 0)) return "Miqdorni yozing";
-    if (type === "raw" && c.product && !isPiece(c.product) && !state.how) return "Qopdami yoki sochmami — tanlang";
+    if (type === "raw" && c.product && !isPiece(c.product) && !state.how) return "Qopdami yoki sementovozdami — tanlang";
     if (type !== "prod" && !c.party) return type === "raw" ? "Kimdan kelganini yozing" : "Xaridorni yozing";
     if (type === "ship" && !c.truck) return "Mashina raqamini yozing";
     return null;
@@ -412,7 +412,7 @@
     const items0 = raw ? (data.r || []).map(n => ({ name: n, piece: isPiece(n), kg: 1 }))
                        : (data.p || []).map(x => ({ name: x[0], unit: x[1], kg: x[2], piece: false }));
     $("l-text").textContent = raw ? "📋 Kelgan xomashyo matni" : "📋 Ishlab chiqarilgan mahsulot matni";
-    $("otext").placeholder = raw ? "Masalan:\n\nAzim aka sement\nSement 30 tonna sochma\nQum 20 tonna\nQop 5000 dona"
+    $("otext").placeholder = raw ? "Masalan:\n\nAzim aka sement\nSement 30 tonna sementovoz\nQum 20 tonna\nQop 5000 dona"
                                  : "Masalan:\n\nPlaster 05 20 tonna\nKliy 510 400 qop\nFinish 5 tonna";
     $("l-prices").textContent = raw ? "💵 Narxi va qanday keldi" : "📦 Topilgan mahsulotlar";
     $("l-day").textContent = raw ? "📅 Qaysi kuni keldi?" : "📅 Qaysi kuni ishlab chiqarildi?";
@@ -454,7 +454,7 @@
             else if (unit === "ta" || unit === "qop" || unit === "meshok" || unit === "paqir" || unit === "vedro" || unit === "dona" || unit === "sht") q = raw ? n * 50 : n * p.kg;
             else if (unit[0] === "t") q = n * 1000; else if (unit[0] === "k") q = n;
             else q = n <= 100 ? n * 1000 : n;
-            r.items.push({ p, q, bulk: /sochma|sochiq|sementovoz|nasip/.test(low) ? true : null, note: raw && !p.piece && /qop|meshok/.test(unit || "") ? "qop 50 kg deb olindi" : "" });
+            r.items.push({ p, q, bulk: /sochma|sochiq|s[e]?mentovoz|smentavoz|nasip/.test(low) ? true : null, note: raw && !p.piece && /qop|meshok/.test(unit || "") ? "qop 50 kg deb olindi" : "" });
             return;
           }
         }
@@ -494,7 +494,7 @@
               b.setAttribute("aria-pressed", String(it.bulk === val));
               b.addEventListener("click", () => { it.bulk = val; savedH[it.p.name] = val; ch.querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", String(c === b))); check(); });
               return b; };
-            ch.appendChild(mk("📦 Qopda", false)); ch.appendChild(mk("🚛 Sochma", true));
+            ch.appendChild(mk("📦 Qopda", false)); ch.appendChild(mk("🚛 Sementovozda", true));
             d.appendChild(ch);
           }
           upd();
@@ -526,7 +526,7 @@
       if (!$("otext").value.trim()) return "Matnni tashlang";
       if (!cur.items.length) return raw ? "Matnda xomashyo topilmadi" : "Matnda mahsulot topilmadi";
       if (raw && !$("tparty").value.trim()) return "Kimdan kelganini yozing";
-      if (raw && cur.items.some(it => !it.p.piece && it.bulk == null)) return "Qopdami yoki sochmami — tanlang";
+      if (raw && cur.items.some(it => !it.p.piece && it.bulk == null)) return "Qopdami yoki sementovozdami — tanlang";
       if (day === "c" && !$("dday").value) return "Kunni tanlang";
       return null;
     }
